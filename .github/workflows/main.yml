@@ -1,16 +1,42 @@
-name: Hello Word
+name: Update README with Changelog
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main   # troque pela branch principal do seu projeto
 
 jobs:
-  hello:
+  update-readme:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: Say Hello
-        run: echo "Hello, GitHub Actions!"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get last commit message
+        id: last_commit
+        run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      - name: Update README with changelog
+        run: |
+          COMMIT_MESSAGE="${{ steps.last_commit.outputs.message }}"
+          
+          # Se não existir "## Changelog", cria a seção
+          if ! grep -q "## Changelog" README.md; then
+            echo -e "\n## Changelog\n" >> README.md
+          fi
+          
+          # Adiciona nova entrada na linha abaixo de "## Changelog"
+          # Escapa possíveis caracteres especiais no commit message
+          ESCAPED_COMMIT_MESSAGE=$(printf '%s\n' "$COMMIT_MESSAGE" | sed 's/[&/\]/\\&/g')
+          sed -i "/## Changelog/a - $(TZ='America/Sao_Paulo' date '+%Y-%m-%d %H:%M') - $ESCAPED_COMMIT_MESSAGE" README.md
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: update changelog with last commit message" || echo "No changes to commit"
+          git push
